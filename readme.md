@@ -13,4 +13,4 @@ Longer term, I’m interested in expanding my knowledge of how these concepts ap
 This project is part of my ongoing professional development and curiosity as an engineer.
 
 ## Resources
-- [Instruction Set Architecture](./instruction_set.md) 
+- [Instruction Set Architecture](./instruction_set_architecture.md) 
