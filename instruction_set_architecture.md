@@ -6,7 +6,7 @@
 
 Sets the RIP register to the target address.
 
-Format: `JMP imm64'
+Format: `JMP imm64`
 
 Example: `JMP 0x0100000000000000`
 
@@ -14,6 +14,6 @@ Example: `JMP 0x0100000000000000`
 
 Stops the simulator.
 
-Format: `JMP'
+Format: `HALT`
 
 Example: `HALT`
