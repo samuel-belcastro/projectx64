@@ -1,8 +1,19 @@
+use core::panic;
+
 use crate::memory::Memory;
 
 /// Deterministic starting point during startup
 /// or reset.
 const RESET_VECTOR: u64 = 0;
+
+const MAX_MEMORY_FETCH_BYTES: usize = 8;
+
+const RAX_REGISTER_NUMBER: u64 = 0x00;
+const RBX_REGISTER_NUMBER: u64 = 0x03;
+
+const MOV_OP_CODE: u8 = 0x01;
+const JUMP_OP_CODE: u8 = 0x10;
+const HALT_OP_CODE: u8 = 0xFF;
 
 pub struct Cpu {
     /// Regiter A eXtended: 
@@ -59,29 +70,36 @@ impl Cpu {
 
     fn execute_instruction(&mut self, instruction: u8) {
         match instruction {
-            0x10 => self.execute_jmp(),
-            0xFF => self.execute_halt(),
-            _ => self.execute_halt(),
+            MOV_OP_CODE => self.execute_mov(),
+            JUMP_OP_CODE => self.execute_jmp(),
+            HALT_OP_CODE => self.execute_halt(),
+            _ => panic!("Unsupported operation code when executing instruction."),
+        }
+    }
+
+
+    fn execute_mov(&mut self) {
+        let dest: u64 = self.read_memory_bytes(1);
+        let val: u64 = self.read_memory_bytes(8);
+
+        println!("Moving {} to {}", val, dest);
+
+        match dest {
+            RAX_REGISTER_NUMBER => self.rax = val,
+            RBX_REGISTER_NUMBER => self.rbx = val,
+            _ => panic!("Invalid destination register for MOV command.")
         }
     }
 
     fn execute_jmp(&mut self) {
         const INSTRUCTION_SIZE: usize = 8;
 
-        let mut memory_bytes: [u8; INSTRUCTION_SIZE] = [0; INSTRUCTION_SIZE];
-        
-        let mut counter: usize = 0;
-        while counter < INSTRUCTION_SIZE {
-            memory_bytes[counter] = self.read_memory();
-            counter += 1;
-        }
-
-        let next_address: u64 = u64::from_le_bytes(memory_bytes);
+        let next_address = self.read_memory_bytes(INSTRUCTION_SIZE);
     
         println!("Jumping to {}", next_address);
 
         self.rip = next_address;
-    }   
+    }
 
     fn execute_halt(&mut self) {
         println!("Halting! (return {})", self.rax);
@@ -96,6 +114,24 @@ impl Cpu {
         // our program after reading memory.
         self.rip = self.rip + 1;
         return data;
+    }
+
+    fn read_memory_bytes(&mut self, bytes: usize) -> u64 {
+        let mut counter: usize = 0;
+
+        if bytes > MAX_MEMORY_FETCH_BYTES {
+            panic!("Cannot read more than 8 bytes from memory at a time.")
+        }
+
+        // Pad data with 0 for data sizes less than MAX_MEMORY_FETCH_BYTES
+        let mut data: [u8; MAX_MEMORY_FETCH_BYTES] = [0; MAX_MEMORY_FETCH_BYTES];
+
+        while counter < bytes {
+            data[counter] = self.read_memory();
+            counter += 1;
+        }
+
+        return u64::from_le_bytes(data);
     }
 }
 
@@ -118,18 +154,25 @@ mod tests {
     fn it_runs_program() {
         let mut memory: Memory = Memory::new(1024);
 
-        let program: Vec<u8> = vec![
-            0x10, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // jump to 0x0009
+        let memory_contents: Vec<u8> = vec![
+            // Bootstrap starting at Mem[0]
+            0x10, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // jump to 0x09
+            
+            // Program starting at Mem[9]
+            0x01, 0x03, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rxb, 6
             0xFF, // halt
         ];
 
         let mut addr: usize = 0;
-        for byte in program {
+        for byte in memory_contents {
             memory.write(addr, byte);
             addr += 1;
         }
 
         let mut sub: Cpu = Cpu::new(memory);
         sub.start();
+        assert!(sub.rax == 0);
+        assert!(sub.rbx == 6);
+        assert!(sub.halted);
     }
 }
